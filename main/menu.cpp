@@ -5,7 +5,7 @@
 Menu *Menu::instance = nullptr;
 
 Menu::Menu(uint8_t p_p, uint8_t s_p, uint8_t n_p, Settings *s, Buzzer *b, RX5808 *r, Api *a, UsbSerial *u)
-  : menuIndex(MAIN),
+  : menuIndex(SCAN),
     previous_pin(p_p), select_pin(s_p), next_pin(n_p),
     selectButtonPressTime(0), selectButtonHeld(false),
     settings(s), buzzer(b), receiver(r), api(a), usb(u),
