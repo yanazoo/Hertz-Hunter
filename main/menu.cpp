@@ -295,7 +295,8 @@ void Menu::drawBatteryVoltage(int voltage) {
     u8g2.drawStr(109, DISPLAY_HEIGHT, formattedVoltage);
     u8g2.setDrawColor(1);
   } else if (menuIndex == SCAN) {
-    u8g2.drawStr(108, DISPLAY_HEIGHT, formattedVoltage);
+    u8g2.setFont(u8g2_font_7x13_tf);
+    u8g2.drawStr(DISPLAY_WIDTH - (int)strlen(formattedVoltage) * 7, DISPLAY_HEIGHT, formattedVoltage);
   }
 }
 
@@ -387,14 +388,14 @@ void Menu::drawScanMenu() {
 
   // Bottom row: marker frequencies when active
   if (showMarkers && markerCount > 0) {
-    u8g2.setFont(u8g2_font_6x10_tf);
+    u8g2.setFont(u8g2_font_7x13_tf);
     for (int m = 0; m < markerCount; m++) {
       if (markerFreqs[m] < 0) continue;
       char label[10];
       snprintf(label, sizeof(label), "M%d:%d", m + 1, markerFreqs[m]);
-      int usableWidth = DISPLAY_WIDTH - 22;
+      int usableWidth = DISPLAY_WIDTH - 30;  // 28px for "X.Xv" at 7px + 2px gap
       int x = m * usableWidth / markerCount;
-      x = min(x, usableWidth - (int)strlen(label) * 6);
+      x = min(x, usableWidth - (int)strlen(label) * 7);
       u8g2.drawStr(x, DISPLAY_HEIGHT, label);
     }
   }
