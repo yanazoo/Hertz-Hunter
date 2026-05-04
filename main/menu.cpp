@@ -392,8 +392,9 @@ void Menu::drawScanMenu() {
       if (markerFreqs[m] < 0) continue;
       char label[10];
       snprintf(label, sizeof(label), "M%d:%d", m + 1, markerFreqs[m]);
-      int x = m * DISPLAY_WIDTH / markerCount;
-      x = min(x, (int)(DISPLAY_WIDTH - 22 - (int)strlen(label) * 6));
+      int usableWidth = DISPLAY_WIDTH - 22;
+      int x = m * usableWidth / markerCount;
+      x = min(x, usableWidth - (int)strlen(label) * 6);
       u8g2.drawStr(x, DISPLAY_HEIGHT, label);
     }
   } else {
