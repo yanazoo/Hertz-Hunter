@@ -451,30 +451,20 @@ void Menu::drawScanMenu() {
   snprintf(percentageStr, sizeof(percentageStr), "%d%%", map(cursorRssi, minRssi, maxRssi, 0, 100));
   u8g2.drawStr(DISPLAY_WIDTH - (strlen(percentageStr) * 7) + 1, 13, percentageStr);
 
-  // Draw spectrum bars pixel-column by pixel-column with linear interpolation
-  // This fills gaps between measurement points for a smooth mountain waveform
-  for (int x = 0; x < numScannedValues * barWidth; x++) {
-    int barIdx = x / barWidth;
-    int frac   = x % barWidth;
-
-    // Interpolate height between this bar and the next
-    int h = barHeights[barIdx];
-    if (frac > 0 && barIdx < numScannedValues - 1) {
-      h = h + (barHeights[barIdx + 1] - h) * frac / barWidth;
-    }
-
-    int screenX = x + padding;
-    bool isSelected = (barIdx == menus[SCAN].menuIndex);
+  // Draw spectrum bars (original box-per-bar style)
+  for (int i = 0; i < numScannedValues; i++) {
+    int h = barHeights[i];
+    int x = i * barWidth + padding;
+    bool isSelected = (i == menus[SCAN].menuIndex);
 
     if (isSelected) {
-      // Full-height inverted column for selected bar
-      u8g2.drawVLine(screenX, BAR_Y_MIN, BAR_Y_MAX - BAR_Y_MIN);
+      u8g2.drawBox(x, BAR_Y_MIN, barWidth, BAR_Y_MAX - BAR_Y_MIN);
       u8g2.setDrawColor(0);
+      u8g2.drawBox(x, BAR_Y_MAX - h, barWidth, h);
+      u8g2.setDrawColor(1);
+    } else {
+      u8g2.drawBox(x, BAR_Y_MAX - h, barWidth, h);
     }
-
-    if (h > 0) u8g2.drawVLine(screenX, BAR_Y_MAX - h, h);
-
-    if (isSelected) u8g2.setDrawColor(1);
   }
 
   // Draw marker cap indicators (XOR so visible on both filled and empty bars)
