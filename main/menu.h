@@ -21,8 +21,8 @@
 #define LONG_PRESS_DURATION (500 - DEBOUNCE_DELAY)
 
 // Keeps small area at top and bottom for text display on scan menu
-#define BAR_Y_MIN 14
-#define BAR_Y_MAX 57
+#define BAR_Y_MIN 18
+#define BAR_Y_MAX 52
 
 // Use rotary encoder instead of buttons for navigation
 // #define ROTARY_ENCODER_INPUT
