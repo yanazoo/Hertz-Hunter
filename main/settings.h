@@ -29,6 +29,8 @@ public:
   VariableRestricted<int> batteryAlarm;  // Should not be directly set outside class
   VariableCallback<int> lowCalibratedRssi;
   VariableCallback<int> highCalibratedRssi;
+  VariableCallback<int> markerCountIndex;
+  VariableRestricted<int> markerCount;  // 0-4 markers
 
   SemaphoreHandle_t settingsMutex;
 

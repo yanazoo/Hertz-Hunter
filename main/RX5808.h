@@ -10,10 +10,17 @@
 #define LOWBAND_MIN_FREQUENCY 5345
 #define SCAN_FREQUENCY_RANGE 300
 
-#define RSSI_STABILISATION_TIME 30
-#define RSSI_SAMPLES 30
+#define RSSI_STABILISATION_TIME 5
+#define RSSI_SAMPLES 10
 
-#define SCAN_STACK_SIZE 2048
+#define SCAN_STACK_SIZE 3072
+
+#define MAX_MARKERS 4
+
+struct MarkerData {
+  int index;
+  int rssi;
+};
 
 // RX5808 receiver module
 class RX5808 {
@@ -25,9 +32,11 @@ public:
 
   VariableArrayRestricted<int, MAX_FREQUENCIES_SCANNED> rssiValues;
   Variable<bool> lowband;
+  MarkerData markers[MAX_MARKERS];
 
   SemaphoreHandle_t scanMutex;
   SemaphoreHandle_t lowbandMutex;
+  SemaphoreHandle_t markersMutex;
 
 private:
   static void _scan(void *parameter);

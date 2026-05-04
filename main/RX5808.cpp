@@ -18,9 +18,16 @@ RX5808::RX5808(uint8_t data, uint8_t le, uint8_t clk, uint8_t rssi, Settings *s)
   digitalWrite(lePin, HIGH);
   digitalWrite(clkPin, LOW);
 
+  // Initialise markers to invalid state
+  for (int i = 0; i < MAX_MARKERS; i++) {
+    markers[i].index = -1;
+    markers[i].rssi = 0;
+  }
+
   // Create mutexes
   scanMutex = xSemaphoreCreateMutex();
   lowbandMutex = xSemaphoreCreateMutex();
+  markersMutex = xSemaphoreCreateMutex();
 
   // Reset receiver
   reset();
@@ -47,8 +54,8 @@ void RX5808::calibrate(bool high) {
   // Set to F4
   setFrequency(5800);
 
-  // Give time for rssi to stabilise
-  delay(RSSI_STABILISATION_TIME);
+  // Give extended time for rssi to stabilise accurately during calibration
+  delay(50);
 
   // Save rssi
   if (high) {
@@ -78,17 +85,16 @@ void RX5808::_scan(void *parameter) {
   // Loop continuously
   // Stops when scanning task cancelled
   while (!receiver->stopRequested) {
+    // Read lowband once per pass to reduce mutex overhead
+    xSemaphoreTake(receiver->lowbandMutex, portMAX_DELAY);
+    bool lowband = receiver->lowband.get();
+    xSemaphoreGive(receiver->lowbandMutex);
+
+    int min_freq = lowband ? LOWBAND_MIN_FREQUENCY : HIGHBAND_MIN_FREQUENCY;
+
     for (int i = 0; i < numScannedValues; i++) {
       // Safely stop scanning when no mutexes taken
       if (receiver->stopRequested) break;
-
-      // Safely get lowband state
-      xSemaphoreTake(receiver->lowbandMutex, portMAX_DELAY);
-      bool lowband = receiver->lowband.get();
-      xSemaphoreGive(receiver->lowbandMutex);
-
-      // Get minimum frequency to support changing to lowband
-      int min_freq = lowband ? LOWBAND_MIN_FREQUENCY : HIGHBAND_MIN_FREQUENCY;
 
       // Set frequency and offset by minimum
       receiver->setFrequency((int)round(i * interval + min_freq));
@@ -104,6 +110,44 @@ void RX5808::_scan(void *parameter) {
       xSemaphoreTake(receiver->scanMutex, portMAX_DELAY);
       receiver->rssiValues.set(i, receiver->readRSSI());
       xSemaphoreGive(receiver->scanMutex);
+    }
+
+    // After each full pass, compute peak markers if requested
+    if (!receiver->stopRequested) {
+      xSemaphoreTake(receiver->settings->settingsMutex, portMAX_DELAY);
+      int numMarkers = receiver->settings->markerCount.get();
+      xSemaphoreGive(receiver->settings->settingsMutex);
+
+      if (numMarkers > 0) {
+        bool used[MAX_FREQUENCIES_SCANNED];
+        memset(used, 0, sizeof(used));
+        MarkerData newMarkers[MAX_MARKERS];
+        for (int m = 0; m < MAX_MARKERS; m++) {
+          newMarkers[m].index = -1;
+          newMarkers[m].rssi = 0;
+        }
+
+        xSemaphoreTake(receiver->scanMutex, portMAX_DELAY);
+        for (int m = 0; m < numMarkers; m++) {
+          int maxVal = -1, maxIdx = -1;
+          for (int i = 0; i < numScannedValues; i++) {
+            if (!used[i] && receiver->rssiValues.get(i) > maxVal) {
+              maxVal = receiver->rssiValues.get(i);
+              maxIdx = i;
+            }
+          }
+          if (maxIdx >= 0) used[maxIdx] = true;
+          newMarkers[m].index = maxIdx;
+          newMarkers[m].rssi = maxVal;
+        }
+        xSemaphoreGive(receiver->scanMutex);
+
+        xSemaphoreTake(receiver->markersMutex, portMAX_DELAY);
+        for (int m = 0; m < MAX_MARKERS; m++) {
+          receiver->markers[m] = (m < numMarkers) ? newMarkers[m] : MarkerData{-1, 0};
+        }
+        xSemaphoreGive(receiver->markersMutex);
+      }
     }
   }
 
@@ -168,7 +212,7 @@ void RX5808::sendBit(bool bit) {
 
   // Pulse clock
   digitalWrite(clkPin, HIGH);
-  delayMicroseconds(10);
+  delayMicroseconds(1);
   digitalWrite(clkPin, LOW);
 }
 

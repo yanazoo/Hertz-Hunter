@@ -6,6 +6,7 @@ Settings::Settings()
     buzzerIndex(DEFAULT_INDEX), buzzer(DEFAULT_BUZZER),
     batteryAlarmIndex(DEFAULT_INDEX), batteryAlarm(DEFAULT_BATTERY_ALARM),
     lowCalibratedRssi(DEFAULT_LOW_CALIBRATED_RSSI), highCalibratedRssi(DEFAULT_HIGH_CALIBRATED_RSSI),
+    markerCountIndex(DEFAULT_INDEX), markerCount(0),
     initialReadDone(false) {
 
   // Create settings mutex
@@ -38,6 +39,12 @@ Settings::Settings()
   highCalibratedRssi.onChange([this](int val) {
     if (initialReadDone) saveSettingsStorage("h_c_rssi", val);
   });
+
+  // When marker count index changes, update actual count (0-4 direct mapping)
+  markerCountIndex.onChange([this](int val) {
+    markerCount.set(val);
+    if (initialReadDone) saveSettingsStorage("m_c_index", val);
+  });
 }
 
 // Save given value to given key
@@ -56,6 +63,7 @@ void Settings::loadSettingsStorage() {
   batteryAlarmIndex.set(preferences.getInt("b_a_index", DEFAULT_INDEX));
   lowCalibratedRssi.set(preferences.getInt("l_c_rssi", DEFAULT_LOW_CALIBRATED_RSSI));
   highCalibratedRssi.set(preferences.getInt("h_c_rssi", DEFAULT_HIGH_CALIBRATED_RSSI));
+  markerCountIndex.set(preferences.getInt("m_c_index", DEFAULT_INDEX));
   xSemaphoreGive(settingsMutex);
   preferences.end();
 
