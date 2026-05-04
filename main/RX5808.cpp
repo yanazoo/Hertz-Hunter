@@ -85,16 +85,16 @@ void RX5808::_scan(void *parameter) {
   // Loop continuously
   // Stops when scanning task cancelled
   while (!receiver->stopRequested) {
-    // Read lowband once per pass to reduce mutex overhead
-    xSemaphoreTake(receiver->lowbandMutex, portMAX_DELAY);
-    bool lowband = receiver->lowband.get();
-    xSemaphoreGive(receiver->lowbandMutex);
-
-    int min_freq = lowband ? LOWBAND_MIN_FREQUENCY : HIGHBAND_MIN_FREQUENCY;
-
     for (int i = 0; i < numScannedValues; i++) {
       // Safely stop scanning when no mutexes taken
       if (receiver->stopRequested) break;
+
+      // Read lowband state per frequency to respond immediately to band changes
+      xSemaphoreTake(receiver->lowbandMutex, portMAX_DELAY);
+      bool lowband = receiver->lowband.get();
+      xSemaphoreGive(receiver->lowbandMutex);
+
+      int min_freq = lowband ? LOWBAND_MIN_FREQUENCY : HIGHBAND_MIN_FREQUENCY;
 
       // Set frequency and offset by minimum
       receiver->setFrequency((int)round(i * interval + min_freq));
