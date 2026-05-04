@@ -13,9 +13,13 @@ The menu items can be navigated between with `PREV` and `NEXT`, and once the des
 
 ### Main
 
-This is the initial menu displayed when the device is powered on. It displays the options to navigate to the `Scan` menu, `Settings` submenu, `About` menu, and a hidden `Advanced` submenu. The current battery voltage is also displayed in the bottom right.
+This is the menu displayed when navigating back from the `Scan` screen. It displays the options to navigate to the `Scan` menu, `Settings` submenu, `About` menu, and a hidden `Advanced` submenu. The current battery voltage is also displayed in the bottom right.
 
 The hidden `Advanced` submenu can be accessed by pressing and holding `SEL`.
+
+> [!NOTE]
+>
+> The device starts directly on the `Scan` screen when powered on, bypassing this menu for faster access.
 
 ### Scan
 
@@ -34,6 +38,16 @@ Across the 300MHz spectrum being scanned (5645MHz to 5945Hz, and 5345MHz to 5645
   - $(300/5)+1$ to also include the final frequency
 - `10MHz` scans 31 frequencies every 10MHz
   - $(300/10)+1$ to also include the final frequency
+
+The currently set option is displayed with the <img src="./icons/Selected.png" alt="Selected" /> icon.
+
+### Markers
+
+Set the number of peak markers shown on the `Scan` screen. After each full scan pass, the device identifies the strongest signal frequencies and marks them with a downward-pointing triangle indicator above the bar graph.
+
+- `Off` — no markers are shown
+- `1` — the single strongest frequency is marked
+- `2` — the two strongest frequencies are marked
 
 The currently set option is displayed with the <img src="./icons/Selected.png" alt="Selected" /> icon.
 
@@ -75,9 +89,11 @@ A histogram of the measured RSSI values is displayed in the `Scan` menu, where s
 
 The top left of the screen displays `HIGH` or `LOW` depending on the frequency range being scanned (`HIGH` for 5645MHz to 5945MHz, and `LOW` for 5345MHz to 5645MHz). These two scanning modes can be switched between with `SEL`.
 
-There is a cursor that can be moved along the spectrum using the `PREV` and `NEXT` inputs. The frequency the cursor is currently on is displayed in the top middle of the screen, and the signal strength on that frequency is reported as a percentage in the top right. More on how this percentage is calculated is covered in [RSSI calibration](#rssi-calibration).
+There is a cursor that can be moved along the spectrum using the `PREV` and `NEXT` inputs. The frequency the cursor is currently on is displayed in the top middle of the screen, and the signal strength on that frequency is reported as a percentage in the top right. More on how this percentage is calculated is covered in [RSSI calibration](#rssi-calibration). When the cursor is positioned on a peak marker frequency, an asterisk (`*`) is shown before the frequency display.
 
-In combination with the frequency markings along the bottom of the screen, this cursor can be used to find what frequency something is broadcasting on, and the strength of the broadcast.
+The current battery voltage is shown in the bottom right of the scan screen.
+
+After each complete scan pass, peak markers are drawn as small downward-pointing triangle indicators above the bar graph at the strongest detected frequencies. The number of markers shown (Off, 1, or 2) is configured in the `Markers` setting. The marker indicators can be toggled on or off at any time by pressing `PREV` and `NEXT` simultaneously. Below the graph, the frequency of each detected peak is listed.
 
 *The cursor shows that something is broadcasting on R4*
 

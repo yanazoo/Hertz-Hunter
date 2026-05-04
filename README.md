@@ -17,6 +17,7 @@ This project aims to make this useful tool more accessible to pilots and race or
 
 ## Features
 
+- Starts directly on the scan screen for quick access
 - Scanning of the RF spectrum commonly used for video by FPV racing drones (5645MHz to 5945MHz) and additional low-band (5345MHz to 5645MHz) frequencies
 - Graphing RSSI to show which frequencies VTXs are broadcasting on
 - Multiple input options for navigating menus and controlling the device
@@ -27,7 +28,10 @@ This project aims to make this useful tool more accessible to pilots and race or
     - The RX5808 only supports 1MHz increments, so this interval is rounded to the nearest integer (e.g. 5800, 5803, 5805, 5808, ...)
   - A 5MHz interval offers a medium resolution at a medium update rate
   - A 10MHz interval offers the lowest resolution at the fastest update rate
-- Battery voltage monitoring with a low battery alarm
+- **Peak marker detection** — automatically identifies the top 1 or 2 peak frequencies after each full scan pass and marks them with a downward-pointing triangle indicator on the graph
+- **Configurable marker count** — set the number of markers (Off, 1, or 2) in the Settings menu
+- **Marker overlay toggle** — show or hide marker indicators on the scan screen with a simultaneous `PREV` + `NEXT` press
+- Battery voltage monitoring with a low battery alarm, displayed on both the main menu and the scan screen
 - Calibration between known low and high RSSI values
 - Displaying calibrated signal strength for the selected frequency
 - Settings saved between reboots
