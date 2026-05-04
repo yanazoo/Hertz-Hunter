@@ -38,6 +38,7 @@ enum MenuIndex {
   SCAN_INTERVAL,
   BUZZER,
   BATTERY_ALARM,
+  MARKERS,       // Settings sub-menus end here
   CALIBRATION,
   WIFI,
   USB_SERIAL,
@@ -82,7 +83,8 @@ private:
   int textCentreX(const char *text, int fontCharWidth);
 
   menuItemStruct mainMenuItems[3];
-  menuItemStruct settingsMenuItems[3];
+  menuItemStruct settingsMenuItems[4];
+  menuItemStruct markersMenuItems[3];
   menuItemStruct scanIntervalMenuItems[3];
   menuItemStruct buzzerMenuItems[2];
   menuItemStruct batteryAlarmMenuItems[3];
@@ -91,6 +93,7 @@ private:
   menuStruct menus[MENU_COUNT];
 
   MenuIndex menuIndex;
+  bool showMarkers;
 
   uint8_t previous_pin;
   uint8_t select_pin;

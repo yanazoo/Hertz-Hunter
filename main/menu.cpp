@@ -8,6 +8,7 @@ Menu::Menu(uint8_t p_p, uint8_t s_p, uint8_t n_p, Settings *s, Buzzer *b, RX5808
   : menuIndex(SCAN),
     previous_pin(p_p), select_pin(s_p), next_pin(n_p),
     selectButtonPressTime(0), selectButtonHeld(false),
+    showMarkers(true),
     settings(s), buzzer(b), receiver(r), api(a), usb(u),
     u8g2(U8G2_R0, U8X8_PIN_NONE) {
   instance = this;  // Set static instance pointer
@@ -94,6 +95,16 @@ void Menu::handleButtons() {
     settings->clearReset();
   }
 
+  // Toggle marker overlay with PREV+NEXT simultaneously on scan screen
+  if (menuIndex == SCAN && prevPressed == HIGH && nextPressed == HIGH) {
+    showMarkers = !showMarkers;
+    xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
+    if (settings->buzzer.get()) buzzer->buzz();
+    xSemaphoreGive(settings->settingsMutex);
+    delay(DEBOUNCE_DELAY * 2);
+    return;
+  }
+
   // Move between menu items
   if (nextPressed == HIGH || prevPressed == HIGH) {
     int direction = (nextPressed == HIGH) ? 1 : -1;
@@ -120,9 +131,9 @@ void Menu::handleButtons() {
       xSemaphoreGive(settings->settingsMutex);
     } else if (!selectButtonHeld && millis() - selectButtonPressTime > LONG_PRESS_DURATION) {  // Held longer than threshold register long press
       switch (menuIndex) {
-        case MAIN: menuIndex = ADVANCED; break;                             // If on main menu, go to advanced
-        case SCAN_INTERVAL ... BATTERY_ALARM: menuIndex = SETTINGS; break;  // If on individual settings menu, go to settings
-        case CALIBRATION ... USB_SERIAL: menuIndex = ADVANCED; break;       // If on individual advanced menu, go to advanced
+        case MAIN: menuIndex = ADVANCED; break;                          // If on main menu, go to advanced
+        case SCAN_INTERVAL ... MARKERS: menuIndex = SETTINGS; break;    // If on individual settings menu, go to settings
+        case CALIBRATION ... USB_SERIAL: menuIndex = ADVANCED; break;   // If on individual advanced menu, go to advanced
         default: menuIndex = MAIN; break;                                   // Otherwise, go back to main menu
       }
 
@@ -160,7 +171,12 @@ void Menu::handleButtons() {
         switch (menus[SETTINGS].menuIndex) {
           case 0: menuIndex = SCAN_INTERVAL; break;  // Go to scan interval menu
           case 1: menuIndex = BUZZER; break;         // Go to buzzer menu
+#ifdef BATTERY_MONITORING
           case 2: menuIndex = BATTERY_ALARM; break;  // Go to battery alarm menu
+          case 3: menuIndex = MARKERS; break;        // Go to markers menu
+#else
+          case 2: menuIndex = MARKERS; break;        // Go to markers menu
+#endif
         }
         break;
       case ADVANCED:  // Handle SELECT on advanced menu
@@ -170,7 +186,7 @@ void Menu::handleButtons() {
           case 2: menuIndex = USB_SERIAL; break;   // Go to serial menu
         }
         break;
-      case SCAN_INTERVAL ... BATTERY_ALARM:  // Handle SELECT on individual settings options
+      case SCAN_INTERVAL ... MARKERS:  // Handle SELECT on individual settings options
         switch (menuIndex) {
           case SCAN_INTERVAL:  // Update scan interval setting
             xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
@@ -186,6 +202,11 @@ void Menu::handleButtons() {
           case BATTERY_ALARM:  // Update battery alarm setting
             xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
             settings->batteryAlarmIndex.set(menus[BATTERY_ALARM].menuIndex);
+            xSemaphoreGive(settings->settingsMutex);
+            break;
+          case MARKERS:  // Update marker count setting
+            xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
+            settings->markerCountIndex.set(menus[MARKERS].menuIndex);
             xSemaphoreGive(settings->settingsMutex);
             break;
         }
@@ -225,11 +246,12 @@ void Menu::drawMenu() {
   }
 
   // Update in-memory icons for individual settings options
-  if (menuIndex >= SCAN_INTERVAL && menuIndex <= BATTERY_ALARM) {
+  if (menuIndex >= SCAN_INTERVAL && menuIndex <= MARKERS) {
     xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
     updateSettingsOptionIcons(&menus[SCAN_INTERVAL], settings->scanIntervalIndex.get());
     updateSettingsOptionIcons(&menus[BUZZER], settings->buzzerIndex.get());
     updateSettingsOptionIcons(&menus[BATTERY_ALARM], settings->batteryAlarmIndex.get());
+    updateSettingsOptionIcons(&menus[MARKERS], settings->markerCountIndex.get());
     xSemaphoreGive(settings->settingsMutex);
   }
 
@@ -279,18 +301,23 @@ void Menu::drawBatteryVoltage(int voltage) {
 
 // Generic function for drawing menus with multiple options
 void Menu::drawSelectionMenu() {
-  // Draw menu items
-  for (int i = 0; i < menus[menuIndex].menuItemsLength; i++) {
-    if (i == menus[menuIndex].menuIndex) {
-      // Highlight selection
-      u8g2.drawBox(0, 16 + (i * 16), DISPLAY_WIDTH, 16);
+  int totalItems = menus[menuIndex].menuItemsLength;
+  int selectedIdx = menus[menuIndex].menuIndex;
+
+  // Calculate scroll offset: show 3 items at a time, keep selection in view
+  int startIndex = max(0, min(selectedIdx - 1, totalItems - 3));
+
+  for (int i = startIndex; i < min(startIndex + 3, totalItems); i++) {
+    int drawPos = i - startIndex;
+    if (i == selectedIdx) {
+      u8g2.drawBox(0, 16 + (drawPos * 16), DISPLAY_WIDTH, 16);
       u8g2.setDrawColor(0);
-      u8g2.drawXBMP(10, 17 + (i * 16), 14, 14, menus[menuIndex].menuItems[i].icon);
-      u8g2.drawStr(30, 28 + (i * 16), menus[menuIndex].menuItems[i].name);
+      u8g2.drawXBMP(10, 17 + (drawPos * 16), 14, 14, menus[menuIndex].menuItems[i].icon);
+      u8g2.drawStr(30, 28 + (drawPos * 16), menus[menuIndex].menuItems[i].name);
       u8g2.setDrawColor(1);
     } else {
-      u8g2.drawXBMP(10, 17 + (i * 16), 14, 14, menus[menuIndex].menuItems[i].icon);
-      u8g2.drawStr(30, 28 + (i * 16), menus[menuIndex].menuItems[i].name);
+      u8g2.drawXBMP(10, 17 + (drawPos * 16), 14, 14, menus[menuIndex].menuItems[i].icon);
+      u8g2.drawStr(30, 28 + (drawPos * 16), menus[menuIndex].menuItems[i].name);
     }
   }
 
@@ -304,97 +331,128 @@ void Menu::drawSelectionMenu() {
 
 // Draw graph of scanned rssi values
 void Menu::drawScanMenu() {
-  // Calculate number of scanned values based off of interval
+  // Get scan parameters
   xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
   float interval = settings->scanInterval.get();
-  xSemaphoreGive(settings->settingsMutex);
-  int numScannedValues = (SCAN_FREQUENCY_RANGE / interval) + 1;  // +1 for final number inclusion
-
-  // Calculate width of each bar in graph by expanding until best fit
-  int barWidth = 1;
-  while ((barWidth + 1) * numScannedValues <= DISPLAY_WIDTH) {
-    barWidth++;
-  }
-
-  // Calculate side padding offset for graph
-  int padding = (int)floor((DISPLAY_WIDTH - (barWidth * numScannedValues)) / 2);
-
-  // Get min and max calibrated rssi
-  xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
   int minRssi = settings->lowCalibratedRssi.get();
   int maxRssi = settings->highCalibratedRssi.get();
   xSemaphoreGive(settings->settingsMutex);
+  int numScannedValues = (SCAN_FREQUENCY_RANGE / interval) + 1;
 
-  // Safely get lowband state
+  // Calculate bar dimensions
+  int barWidth = 1;
+  while ((barWidth + 1) * numScannedValues <= DISPLAY_WIDTH) barWidth++;
+  int padding = (int)floor((DISPLAY_WIDTH - (barWidth * numScannedValues)) / 2);
+
+  // Get lowband state
   xSemaphoreTake(receiver->lowbandMutex, portMAX_DELAY);
   bool lowband = receiver->lowband.get();
   xSemaphoreGive(receiver->lowbandMutex);
-
-  // Draw bottom numbers
-  u8g2.setFont(u8g2_font_5x7_tf);
-  if (lowband) {
-    u8g2.drawStr(0, DISPLAY_HEIGHT, "5345");
-    u8g2.drawStr(55, DISPLAY_HEIGHT, "5495");
-    u8g2.drawStr(109, DISPLAY_HEIGHT, "5645");
-  } else {
-    u8g2.drawStr(0, DISPLAY_HEIGHT, "5645");
-    u8g2.drawStr(55, DISPLAY_HEIGHT, "5795");
-    u8g2.drawStr(109, DISPLAY_HEIGHT, "5945");
-  }
-
-  // Draw high or low band
-  u8g2.setFont(u8g2_font_7x13_tf);
-  if (lowband) {
-    u8g2.drawStr(0, 13, "LOW");
-  } else {
-    u8g2.drawStr(0, 13, "HIGH");
-  }
-
-  // Draw selected frequency
-  char currentFrequency[8];
   int min_freq = lowband ? LOWBAND_MIN_FREQUENCY : HIGHBAND_MIN_FREQUENCY;
-  snprintf(currentFrequency, sizeof(currentFrequency), "%dMHz", (int)round(menus[SCAN].menuIndex * interval + min_freq));
-  u8g2.drawStr(textCentreX(currentFrequency, 7), 13, currentFrequency);
 
-  // Safely get current rssi
-  int currentFrequencyRssi;
+  // Read all RSSI values at once for a consistent display frame
+  int barHeights[MAX_FREQUENCIES_SCANNED];
+  int cursorRssi;
   xSemaphoreTake(receiver->scanMutex, portMAX_DELAY);
-  currentFrequencyRssi = receiver->rssiValues.get(menus[SCAN].menuIndex);
+  for (int i = 0; i < numScannedValues; i++) {
+    int rssi = std::clamp(receiver->rssiValues.get(i), minRssi, maxRssi);
+    barHeights[i] = map(rssi, minRssi, maxRssi, 0, BAR_Y_MAX - BAR_Y_MIN);
+  }
+  cursorRssi = receiver->rssiValues.get(menus[SCAN].menuIndex);
   xSemaphoreGive(receiver->scanMutex);
 
-  // Clamp and convert rssi to percentage
-  currentFrequencyRssi = std::clamp(currentFrequencyRssi, minRssi, maxRssi);
+  // Collect marker info
+  int markerCount = 0;
+  int markerIndices[MAX_MARKERS];
+  int markerFreqs[MAX_MARKERS];
+  bool cursorOnMarker = false;
+  for (int m = 0; m < MAX_MARKERS; m++) markerIndices[m] = -1;
+
+  if (showMarkers) {
+    xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
+    markerCount = settings->markerCount.get();
+    xSemaphoreGive(settings->settingsMutex);
+    if (markerCount > 0) {
+      xSemaphoreTake(receiver->markersMutex, portMAX_DELAY);
+      for (int m = 0; m < markerCount; m++) {
+        markerIndices[m] = receiver->markers[m].index;
+        markerFreqs[m] = (markerIndices[m] >= 0)
+          ? (int)round(markerIndices[m] * interval + min_freq)
+          : -1;
+        if (markerIndices[m] == menus[SCAN].menuIndex) cursorOnMarker = true;
+      }
+      xSemaphoreGive(receiver->markersMutex);
+    }
+  }
+
+  // Bottom row: marker frequencies when active, otherwise band reference labels
+  if (showMarkers && markerCount > 0) {
+    u8g2.setFont(u8g2_font_6x10_tf);
+    for (int m = 0; m < markerCount; m++) {
+      if (markerFreqs[m] < 0) continue;
+      char label[10];
+      snprintf(label, sizeof(label), "M%d:%d", m + 1, markerFreqs[m]);
+      int x = m * DISPLAY_WIDTH / markerCount;
+      x = min(x, (int)(DISPLAY_WIDTH - (int)strlen(label) * 6));
+      u8g2.drawStr(x, DISPLAY_HEIGHT, label);
+    }
+  } else {
+    u8g2.setFont(u8g2_font_5x7_tf);
+    if (lowband) {
+      u8g2.drawStr(0, DISPLAY_HEIGHT, "5345");
+      u8g2.drawStr(55, DISPLAY_HEIGHT, "5495");
+      u8g2.drawStr(109, DISPLAY_HEIGHT, "5645");
+    } else {
+      u8g2.drawStr(0, DISPLAY_HEIGHT, "5645");
+      u8g2.drawStr(55, DISPLAY_HEIGHT, "5795");
+      u8g2.drawStr(109, DISPLAY_HEIGHT, "5945");
+    }
+  }
+
+  // Header left: band label
+  u8g2.setFont(u8g2_font_7x13_tf);
+  if (lowband) u8g2.drawStr(0, 13, "LOW");
+  else         u8g2.drawStr(0, 13, "HIGH");
+
+  // Header center: cursor frequency (* when on a marker)
+  char currentFrequency[9];
+  int cursorFreq = (int)round(menus[SCAN].menuIndex * interval + min_freq);
+  if (cursorOnMarker)
+    snprintf(currentFrequency, sizeof(currentFrequency), "*%dMHz", cursorFreq);
+  else
+    snprintf(currentFrequency, sizeof(currentFrequency), "%dMHz", cursorFreq);
+  u8g2.drawStr(textCentreX(currentFrequency, 7), 13, currentFrequency);
+
+  // Header right: cursor RSSI%
+  cursorRssi = std::clamp(cursorRssi, minRssi, maxRssi);
   char percentageStr[5];
-  snprintf(percentageStr, sizeof(percentageStr), "%d%%", map(currentFrequencyRssi, minRssi, maxRssi, 0, 100));
+  snprintf(percentageStr, sizeof(percentageStr), "%d%%", map(cursorRssi, minRssi, maxRssi, 0, 100));
+  u8g2.drawStr(DISPLAY_WIDTH - (strlen(percentageStr) * 7) + 1, 13, percentageStr);
 
-  // Draw rssi percentage accounting for changes from 3 to 4 characters
-  int percentageX = DISPLAY_WIDTH - (strlen(percentageStr) * 7) + 1;
-  u8g2.drawStr(percentageX, 13, percentageStr);
-
-  // Iterate through rssi values
+  // Draw bars
   for (int i = 0; i < numScannedValues; i++) {
-    // Safely get current rssi
-    int rssi;
-    xSemaphoreTake(receiver->scanMutex, portMAX_DELAY);
-    rssi = receiver->rssiValues.get(i);
-    xSemaphoreGive(receiver->scanMutex);
-
-    // Clamp rssi between calibrated values
-    rssi = std::clamp(rssi, minRssi, maxRssi);
-
-    // Calculate height of individual bar
-    int barHeight = map(rssi, minRssi, maxRssi, 0, BAR_Y_MAX - BAR_Y_MIN);
-
-    // Draw box with x-offset
-    // Highlight selection
+    int h = barHeights[i];
+    int x = i * barWidth + padding;
     if (i == menus[SCAN].menuIndex) {
-      u8g2.drawBox(i * barWidth + padding, BAR_Y_MIN, barWidth, BAR_Y_MAX - BAR_Y_MIN);
+      u8g2.drawBox(x, BAR_Y_MIN, barWidth, BAR_Y_MAX - BAR_Y_MIN);
       u8g2.setDrawColor(0);
-      u8g2.drawBox(i * barWidth + padding, BAR_Y_MAX - barHeight, barWidth, barHeight);
+      if (h > 0) u8g2.drawBox(x, BAR_Y_MAX - h, barWidth, h);
       u8g2.setDrawColor(1);
     } else {
-      u8g2.drawBox(i * barWidth + padding, BAR_Y_MAX - barHeight, barWidth, barHeight);
+      if (h > 0) u8g2.drawBox(x, BAR_Y_MAX - h, barWidth, h);
     }
+  }
+
+  // Draw marker cap indicators (XOR so visible on both filled and empty bars)
+  if (showMarkers && markerCount > 0) {
+    u8g2.setDrawColor(2);
+    for (int m = 0; m < markerCount; m++) {
+      int mIdx = markerIndices[m];
+      if (mIdx >= 0 && mIdx < numScannedValues) {
+        u8g2.drawBox(mIdx * barWidth + padding, BAR_Y_MIN, barWidth, 2);
+      }
+    }
+    u8g2.setDrawColor(1);
   }
 }
 
@@ -466,6 +524,12 @@ void Menu::initMenus() {
   settingsMenuItems[0] = { "Scan interval", bitmap_Interval };
   settingsMenuItems[1] = { "Buzzer", bitmap_Buzzer };
   settingsMenuItems[2] = { "Bat. alarm", bitmap_Alarm };
+  settingsMenuItems[3] = { "Markers", bitmap_Calibration };
+
+  // Markers menu
+  markersMenuItems[0] = { "Off", bitmap_Blank };
+  markersMenuItems[1] = { "1", bitmap_Blank };
+  markersMenuItems[2] = { "2", bitmap_Blank };
 
   // Scan Interval menu
   scanIntervalMenuItems[0] = { "2.5MHz", bitmap_Blank };
@@ -490,12 +554,11 @@ void Menu::initMenus() {
   calibrationMenuItems[0] = { "Calib. high", bitmap_Wifi };
   calibrationMenuItems[1] = { "Calib. low", bitmap_WifiLow };
 
-  // Hacky method of changing settings menu length
-  // Stops battery alarm menu option being drawn
+  // Settings menu length varies by build configuration
 #ifdef BATTERY_MONITORING
-  int settingsLength = 3;
+  int settingsLength = 4;
 #else
-  int settingsLength = 2;
+  int settingsLength = 3;
 #endif
 
   // Menus
@@ -507,6 +570,7 @@ void Menu::initMenus() {
   menus[SCAN_INTERVAL] = { "Scan interval", scanIntervalMenuItems, 3, 0 };
   menus[BUZZER] = { "Buzzer", buzzerMenuItems, 2, 0 };
   menus[BATTERY_ALARM] = { "Bat. alarm", batteryAlarmMenuItems, 3, 0 };
+  menus[MARKERS] = { "Markers", markersMenuItems, 3, 0 };
   menus[CALIBRATION] = { "Calibration", calibrationMenuItems, 2, 0 };
   menus[WIFI] = { "Wi-Fi", nullptr, 1, 0 };
   menus[USB_SERIAL] = { "USB Serial", nullptr, 1, 0 };

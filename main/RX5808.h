@@ -15,6 +15,13 @@
 
 #define SCAN_STACK_SIZE 2048
 
+#define MAX_MARKERS 2
+
+struct MarkerData {
+  int index;
+  int rssi;
+};
+
 // RX5808 receiver module
 class RX5808 {
 public:
@@ -25,9 +32,11 @@ public:
 
   VariableArrayRestricted<int, MAX_FREQUENCIES_SCANNED> rssiValues;
   Variable<bool> lowband;
+  MarkerData markers[MAX_MARKERS];
 
   SemaphoreHandle_t scanMutex;
   SemaphoreHandle_t lowbandMutex;
+  SemaphoreHandle_t markersMutex;
 
 private:
   static void _scan(void *parameter);
