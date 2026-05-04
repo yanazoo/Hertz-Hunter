@@ -212,7 +212,7 @@ void RX5808::sendBit(bool bit) {
 
   // Pulse clock
   digitalWrite(clkPin, HIGH);
-  delayMicroseconds(1);
+  delayMicroseconds(10);
   digitalWrite(clkPin, LOW);
 }
 
