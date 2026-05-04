@@ -404,21 +404,18 @@ void Menu::drawScanMenu() {
   }
 
   // Bottom row: marker frequencies when active, otherwise band reference labels
-  u8g2.setFont(u8g2_font_5x7_tf);
   if (showMarkers && markerCount > 0) {
+    u8g2.setFont(u8g2_font_6x10_tf);
     for (int m = 0; m < markerCount; m++) {
       if (markerFreqs[m] < 0) continue;
-      char label[12];
-      if (markerCount <= 2) {
-        snprintf(label, sizeof(label), "M%d:%dMHz", m + 1, markerFreqs[m]);
-      } else {
-        snprintf(label, sizeof(label), "M%d:%d", m + 1, markerFreqs[m]);
-      }
+      char label[10];
+      snprintf(label, sizeof(label), "M%d:%d", m + 1, markerFreqs[m]);
       int x = m * DISPLAY_WIDTH / markerCount;
-      x = min(x, (int)(DISPLAY_WIDTH - (int)strlen(label) * 5));
+      x = min(x, (int)(DISPLAY_WIDTH - (int)strlen(label) * 6));
       u8g2.drawStr(x, DISPLAY_HEIGHT, label);
     }
   } else {
+    u8g2.setFont(u8g2_font_5x7_tf);
     if (lowband) {
       u8g2.drawStr(0, DISPLAY_HEIGHT, "5345");
       u8g2.drawStr(55, DISPLAY_HEIGHT, "5495");
@@ -451,7 +448,8 @@ void Menu::drawScanMenu() {
   snprintf(percentageStr, sizeof(percentageStr), "%d%%", map(cursorRssi, minRssi, maxRssi, 0, 100));
   u8g2.drawStr(DISPLAY_WIDTH - (strlen(percentageStr) * 7) + 1, 13, percentageStr);
 
-  // Draw spectrum bars (original box-per-bar style)
+  // Draw bars (box style) with vertical step-fill between adjacent bars
+  // At each bar boundary, fill the height gap so adjacent bars visually connect
   for (int i = 0; i < numScannedValues; i++) {
     int h = barHeights[i];
     int x = i * barWidth + padding;
@@ -460,10 +458,18 @@ void Menu::drawScanMenu() {
     if (isSelected) {
       u8g2.drawBox(x, BAR_Y_MIN, barWidth, BAR_Y_MAX - BAR_Y_MIN);
       u8g2.setDrawColor(0);
-      u8g2.drawBox(x, BAR_Y_MAX - h, barWidth, h);
+      if (h > 0) u8g2.drawBox(x, BAR_Y_MAX - h, barWidth, h);
       u8g2.setDrawColor(1);
     } else {
-      u8g2.drawBox(x, BAR_Y_MAX - h, barWidth, h);
+      if (h > 0) u8g2.drawBox(x, BAR_Y_MAX - h, barWidth, h);
+      // Left edge: fill step-down from previous taller bar
+      if (i > 0 && barHeights[i - 1] > h) {
+        u8g2.drawVLine(x, BAR_Y_MAX - barHeights[i - 1], barHeights[i - 1] - h);
+      }
+      // Right edge: fill step-up to next taller bar
+      if (i < numScannedValues - 1 && barHeights[i + 1] > h) {
+        u8g2.drawVLine(x + barWidth - 1, BAR_Y_MAX - barHeights[i + 1], barHeights[i + 1] - h);
+      }
     }
   }
 
