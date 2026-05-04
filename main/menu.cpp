@@ -385,7 +385,7 @@ void Menu::drawScanMenu() {
     }
   }
 
-  // Bottom row: marker frequencies when active, otherwise band reference labels
+  // Bottom row: marker frequencies when active
   if (showMarkers && markerCount > 0) {
     u8g2.setFont(u8g2_font_6x10_tf);
     for (int m = 0; m < markerCount; m++) {
@@ -396,17 +396,6 @@ void Menu::drawScanMenu() {
       int x = m * usableWidth / markerCount;
       x = min(x, usableWidth - (int)strlen(label) * 6);
       u8g2.drawStr(x, DISPLAY_HEIGHT, label);
-    }
-  } else {
-    u8g2.setFont(u8g2_font_5x7_tf);
-    if (lowband) {
-      u8g2.drawStr(0, DISPLAY_HEIGHT, "5345");
-      u8g2.drawStr(55, DISPLAY_HEIGHT, "5495");
-      u8g2.drawStr(86, DISPLAY_HEIGHT, "5645");
-    } else {
-      u8g2.drawStr(0, DISPLAY_HEIGHT, "5645");
-      u8g2.drawStr(55, DISPLAY_HEIGHT, "5795");
-      u8g2.drawStr(86, DISPLAY_HEIGHT, "5945");
     }
   }
 
