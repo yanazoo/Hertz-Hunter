@@ -349,139 +349,144 @@ void Menu::drawSelectionMenu() {
 
 // Draw graph of scanned rssi values
 void Menu::drawScanMenu() {
-  // Calculate number of scanned values based off of interval
+  // Get scan parameters
   xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
   float interval = settings->scanInterval.get();
-  xSemaphoreGive(settings->settingsMutex);
-  int numScannedValues = (SCAN_FREQUENCY_RANGE / interval) + 1;  // +1 for final number inclusion
-
-  // Calculate width of each bar in graph by expanding until best fit
-  int barWidth = 1;
-  while ((barWidth + 1) * numScannedValues <= DISPLAY_WIDTH) {
-    barWidth++;
-  }
-
-  // Calculate side padding offset for graph
-  int padding = (int)floor((DISPLAY_WIDTH - (barWidth * numScannedValues)) / 2);
-
-  // Get min and max calibrated rssi
-  xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
   int minRssi = settings->lowCalibratedRssi.get();
   int maxRssi = settings->highCalibratedRssi.get();
   xSemaphoreGive(settings->settingsMutex);
+  int numScannedValues = (SCAN_FREQUENCY_RANGE / interval) + 1;
 
-  // Safely get lowband state
+  // Calculate bar dimensions
+  int barWidth = 1;
+  while ((barWidth + 1) * numScannedValues <= DISPLAY_WIDTH) barWidth++;
+  int padding = (int)floor((DISPLAY_WIDTH - (barWidth * numScannedValues)) / 2);
+
+  // Get lowband state
   xSemaphoreTake(receiver->lowbandMutex, portMAX_DELAY);
   bool lowband = receiver->lowband.get();
   xSemaphoreGive(receiver->lowbandMutex);
+  int min_freq = lowband ? LOWBAND_MIN_FREQUENCY : HIGHBAND_MIN_FREQUENCY;
 
-  // Collect marker info once per frame if overlay is active
+  // Read all RSSI values at once for a consistent display frame
+  int barHeights[MAX_FREQUENCIES_SCANNED];
+  int cursorRssi;
+  xSemaphoreTake(receiver->scanMutex, portMAX_DELAY);
+  for (int i = 0; i < numScannedValues; i++) {
+    int rssi = std::clamp(receiver->rssiValues.get(i), minRssi, maxRssi);
+    barHeights[i] = map(rssi, minRssi, maxRssi, 0, BAR_Y_MAX - BAR_Y_MIN);
+  }
+  cursorRssi = receiver->rssiValues.get(menus[SCAN].menuIndex);
+  xSemaphoreGive(receiver->scanMutex);
+
+  // Collect marker info
   int markerCount = 0;
   int markerIndices[MAX_MARKERS];
-  for (int m = 0; m < MAX_MARKERS; m++) markerIndices[m] = -1;
+  int markerFreqs[MAX_MARKERS];
   bool cursorOnMarker = false;
+  for (int m = 0; m < MAX_MARKERS; m++) markerIndices[m] = -1;
 
   if (showMarkers) {
     xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
     markerCount = settings->markerCount.get();
     xSemaphoreGive(settings->settingsMutex);
-
     if (markerCount > 0) {
       xSemaphoreTake(receiver->markersMutex, portMAX_DELAY);
       for (int m = 0; m < markerCount; m++) {
         markerIndices[m] = receiver->markers[m].index;
+        markerFreqs[m] = (markerIndices[m] >= 0)
+          ? (int)round(markerIndices[m] * interval + min_freq)
+          : -1;
         if (markerIndices[m] == menus[SCAN].menuIndex) cursorOnMarker = true;
       }
       xSemaphoreGive(receiver->markersMutex);
     }
   }
 
-  // Draw bottom numbers
+  // Bottom row: marker frequencies when active, otherwise band reference labels
   u8g2.setFont(u8g2_font_5x7_tf);
-  if (lowband) {
-    u8g2.drawStr(0, DISPLAY_HEIGHT, "5345");
-    u8g2.drawStr(55, DISPLAY_HEIGHT, "5495");
-    u8g2.drawStr(109, DISPLAY_HEIGHT, "5645");
+  if (showMarkers && markerCount > 0) {
+    for (int m = 0; m < markerCount; m++) {
+      if (markerFreqs[m] < 0) continue;
+      char label[12];
+      if (markerCount <= 2) {
+        snprintf(label, sizeof(label), "M%d:%dMHz", m + 1, markerFreqs[m]);
+      } else {
+        snprintf(label, sizeof(label), "M%d:%d", m + 1, markerFreqs[m]);
+      }
+      int x = m * DISPLAY_WIDTH / markerCount;
+      x = min(x, (int)(DISPLAY_WIDTH - (int)strlen(label) * 5));
+      u8g2.drawStr(x, DISPLAY_HEIGHT, label);
+    }
   } else {
-    u8g2.drawStr(0, DISPLAY_HEIGHT, "5645");
-    u8g2.drawStr(55, DISPLAY_HEIGHT, "5795");
-    u8g2.drawStr(109, DISPLAY_HEIGHT, "5945");
-  }
-
-  // Draw band label or monitor mode indicator
-  u8g2.setFont(u8g2_font_7x13_tf);
-  if (receiver->monitorMode) {
-    u8g2.drawStr(0, 13, "MON");
-  } else if (lowband) {
-    u8g2.drawStr(0, 13, "LOW");
-  } else {
-    u8g2.drawStr(0, 13, "HIGH");
-  }
-
-  // Draw selected frequency (* prefix when cursor is on a marker)
-  char currentFrequency[9];
-  int min_freq = lowband ? LOWBAND_MIN_FREQUENCY : HIGHBAND_MIN_FREQUENCY;
-  int cursorFreq = (int)round(menus[SCAN].menuIndex * interval + min_freq);
-  if (cursorOnMarker) {
-    snprintf(currentFrequency, sizeof(currentFrequency), "*%dMHz", cursorFreq);
-  } else {
-    snprintf(currentFrequency, sizeof(currentFrequency), "%dMHz", cursorFreq);
-  }
-  u8g2.drawStr(textCentreX(currentFrequency, 7), 13, currentFrequency);
-
-  // Safely get current rssi
-  int currentFrequencyRssi;
-  xSemaphoreTake(receiver->scanMutex, portMAX_DELAY);
-  currentFrequencyRssi = receiver->rssiValues.get(menus[SCAN].menuIndex);
-  xSemaphoreGive(receiver->scanMutex);
-
-  // Clamp and convert rssi to percentage
-  currentFrequencyRssi = std::clamp(currentFrequencyRssi, minRssi, maxRssi);
-  char percentageStr[5];
-  snprintf(percentageStr, sizeof(percentageStr), "%d%%", map(currentFrequencyRssi, minRssi, maxRssi, 0, 100));
-
-  // Draw rssi percentage accounting for changes from 3 to 4 characters
-  int percentageX = DISPLAY_WIDTH - (strlen(percentageStr) * 7) + 1;
-  u8g2.drawStr(percentageX, 13, percentageStr);
-
-  // Iterate through rssi values
-  for (int i = 0; i < numScannedValues; i++) {
-    // Safely get current rssi
-    int rssi;
-    xSemaphoreTake(receiver->scanMutex, portMAX_DELAY);
-    rssi = receiver->rssiValues.get(i);
-    xSemaphoreGive(receiver->scanMutex);
-
-    // Clamp rssi between calibrated values
-    rssi = std::clamp(rssi, minRssi, maxRssi);
-
-    // Calculate height of individual bar
-    int barHeight = map(rssi, minRssi, maxRssi, 0, BAR_Y_MAX - BAR_Y_MIN);
-
-    // Draw box with x-offset
-    // Highlight selection
-    if (i == menus[SCAN].menuIndex) {
-      u8g2.drawBox(i * barWidth + padding, BAR_Y_MIN, barWidth, BAR_Y_MAX - BAR_Y_MIN);
-      u8g2.setDrawColor(0);
-      u8g2.drawBox(i * barWidth + padding, BAR_Y_MAX - barHeight, barWidth, barHeight);
-      u8g2.setDrawColor(1);
+    if (lowband) {
+      u8g2.drawStr(0, DISPLAY_HEIGHT, "5345");
+      u8g2.drawStr(55, DISPLAY_HEIGHT, "5495");
+      u8g2.drawStr(109, DISPLAY_HEIGHT, "5645");
     } else {
-      u8g2.drawBox(i * barWidth + padding, BAR_Y_MAX - barHeight, barWidth, barHeight);
+      u8g2.drawStr(0, DISPLAY_HEIGHT, "5645");
+      u8g2.drawStr(55, DISPLAY_HEIGHT, "5795");
+      u8g2.drawStr(109, DISPLAY_HEIGHT, "5945");
     }
   }
 
-  // Draw marker indicators (XOR so visible on both high and low bars)
+  // Header left: band or monitor label
+  u8g2.setFont(u8g2_font_7x13_tf);
+  if (receiver->monitorMode) u8g2.drawStr(0, 13, "MON");
+  else if (lowband)          u8g2.drawStr(0, 13, "LOW");
+  else                       u8g2.drawStr(0, 13, "HIGH");
+
+  // Header center: cursor frequency (* when on a marker)
+  char currentFrequency[9];
+  int cursorFreq = (int)round(menus[SCAN].menuIndex * interval + min_freq);
+  if (cursorOnMarker)
+    snprintf(currentFrequency, sizeof(currentFrequency), "*%dMHz", cursorFreq);
+  else
+    snprintf(currentFrequency, sizeof(currentFrequency), "%dMHz", cursorFreq);
+  u8g2.drawStr(textCentreX(currentFrequency, 7), 13, currentFrequency);
+
+  // Header right: cursor RSSI%
+  cursorRssi = std::clamp(cursorRssi, minRssi, maxRssi);
+  char percentageStr[5];
+  snprintf(percentageStr, sizeof(percentageStr), "%d%%", map(cursorRssi, minRssi, maxRssi, 0, 100));
+  u8g2.drawStr(DISPLAY_WIDTH - (strlen(percentageStr) * 7) + 1, 13, percentageStr);
+
+  // Draw spectrum bars pixel-column by pixel-column with linear interpolation
+  // This fills gaps between measurement points for a smooth mountain waveform
+  for (int x = 0; x < numScannedValues * barWidth; x++) {
+    int barIdx = x / barWidth;
+    int frac   = x % barWidth;
+
+    // Interpolate height between this bar and the next
+    int h = barHeights[barIdx];
+    if (frac > 0 && barIdx < numScannedValues - 1) {
+      h = h + (barHeights[barIdx + 1] - h) * frac / barWidth;
+    }
+
+    int screenX = x + padding;
+    bool isSelected = (barIdx == menus[SCAN].menuIndex);
+
+    if (isSelected) {
+      // Full-height inverted column for selected bar
+      u8g2.drawVLine(screenX, BAR_Y_MIN, BAR_Y_MAX - BAR_Y_MIN);
+      u8g2.setDrawColor(0);
+    }
+
+    if (h > 0) u8g2.drawVLine(screenX, BAR_Y_MAX - h, h);
+
+    if (isSelected) u8g2.setDrawColor(1);
+  }
+
+  // Draw marker cap indicators (XOR so visible on both filled and empty bars)
   if (showMarkers && markerCount > 0) {
-    u8g2.setDrawColor(2);  // XOR mode
+    u8g2.setDrawColor(2);
     for (int m = 0; m < markerCount; m++) {
       int mIdx = markerIndices[m];
       if (mIdx >= 0 && mIdx < numScannedValues) {
-        int mx = mIdx * barWidth + padding;
-        // Draw full-width cap at very top of bar area
-        u8g2.drawBox(mx, BAR_Y_MIN, barWidth, 2);
+        u8g2.drawBox(mIdx * barWidth + padding, BAR_Y_MIN, barWidth, 2);
       }
     }
-    u8g2.setDrawColor(1);  // Restore normal draw mode
+    u8g2.setDrawColor(1);
   }
 }
 
