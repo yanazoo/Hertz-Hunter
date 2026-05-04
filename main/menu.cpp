@@ -442,7 +442,7 @@ void Menu::drawScanMenu() {
       int mIdx = markerIndices[m];
       if (mIdx >= 0 && mIdx < numScannedValues) {
         int cx = mIdx * barWidth + padding + barWidth / 2;
-        u8g2.drawTriangle(cx - 2, BAR_Y_MIN - 5, cx + 2, BAR_Y_MIN - 5, cx, BAR_Y_MIN - 1);
+        u8g2.drawTriangle(cx - 1, BAR_Y_MIN - 3, cx + 1, BAR_Y_MIN - 3, cx, BAR_Y_MIN - 1);
       }
     }
     u8g2.setDrawColor(1);
