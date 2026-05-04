@@ -239,10 +239,10 @@ void Menu::sendBuffer() {
 void Menu::drawMenu() {
   // Draw title, but not for scan menu
   if (menuIndex != SCAN) {
-    u8g2.setFont(u8g2_font_8x13B_tf);
+    u8g2.setFont(u8g2_font_7x13B_tf);
     const char *title = menus[menuIndex].title;
-    u8g2.drawStr(textCentreX(title, 8), 13, title);
-    u8g2.setFont(u8g2_font_7x13_tf);
+    u8g2.drawStr(textCentreX(title, 7), 13, title);
+    u8g2.setFont(u8g2_font_6x12_tf);
   }
 
   // Update in-memory icons for individual settings options
@@ -295,8 +295,8 @@ void Menu::drawBatteryVoltage(int voltage) {
     u8g2.drawStr(109, DISPLAY_HEIGHT, formattedVoltage);
     u8g2.setDrawColor(1);
   } else if (menuIndex == SCAN) {
-    u8g2.setFont(u8g2_font_7x13_tf);
-    u8g2.drawStr(DISPLAY_WIDTH - (int)strlen(formattedVoltage) * 7, DISPLAY_HEIGHT, formattedVoltage);
+    u8g2.setFont(u8g2_font_6x12_tf);
+    u8g2.drawStr(DISPLAY_WIDTH - (int)strlen(formattedVoltage) * 6, DISPLAY_HEIGHT, formattedVoltage);
   }
 }
 
@@ -388,20 +388,20 @@ void Menu::drawScanMenu() {
 
   // Bottom row: marker frequencies when active
   if (showMarkers && markerCount > 0) {
-    u8g2.setFont(u8g2_font_7x13_tf);
+    u8g2.setFont(u8g2_font_6x12_tf);
     for (int m = 0; m < markerCount; m++) {
       if (markerFreqs[m] < 0) continue;
       char label[10];
       snprintf(label, sizeof(label), "M%d:%d", m + 1, markerFreqs[m]);
-      int usableWidth = DISPLAY_WIDTH - 30;  // 28px for "X.Xv" at 7px + 2px gap
+      int usableWidth = DISPLAY_WIDTH - 26;  // 24px for "X.Xv" at 6px + 2px gap
       int x = m * usableWidth / markerCount;
-      x = min(x, usableWidth - (int)strlen(label) * 7);
+      x = min(x, usableWidth - (int)strlen(label) * 6);
       u8g2.drawStr(x, DISPLAY_HEIGHT, label);
     }
   }
 
   // Header left: band label
-  u8g2.setFont(u8g2_font_7x13_tf);
+  u8g2.setFont(u8g2_font_6x12_tf);
   if (lowband) u8g2.drawStr(0, 13, "LOW");
   else         u8g2.drawStr(0, 13, "HIGH");
 
@@ -412,13 +412,13 @@ void Menu::drawScanMenu() {
     snprintf(currentFrequency, sizeof(currentFrequency), "*%dMHz", cursorFreq);
   else
     snprintf(currentFrequency, sizeof(currentFrequency), "%dMHz", cursorFreq);
-  u8g2.drawStr(textCentreX(currentFrequency, 7), 13, currentFrequency);
+  u8g2.drawStr(textCentreX(currentFrequency, 6), 13, currentFrequency);
 
   // Header right: cursor RSSI%
   cursorRssi = std::clamp(cursorRssi, minRssi, maxRssi);
   char percentageStr[5];
   snprintf(percentageStr, sizeof(percentageStr), "%d%%", map(cursorRssi, minRssi, maxRssi, 0, 100));
-  u8g2.drawStr(DISPLAY_WIDTH - (strlen(percentageStr) * 7) + 1, 13, percentageStr);
+  u8g2.drawStr(DISPLAY_WIDTH - (strlen(percentageStr) * 6) + 1, 13, percentageStr);
 
   // Draw bars
   for (int i = 0; i < numScannedValues; i++) {
@@ -450,35 +450,35 @@ void Menu::drawScanMenu() {
 // Draw static content on about menu
 void Menu::drawAboutMenu() {
   const char *info = "5.8GHz scanner";
-  u8g2.drawStr(textCentreX(info, 7), 28, info);
+  u8g2.drawStr(textCentreX(info, 6), 28, info);
 
-  u8g2.drawStr(textCentreX(VERSION, 7), 44, VERSION);
+  u8g2.drawStr(textCentreX(VERSION, 6), 44, VERSION);
 
-  u8g2.drawStr(textCentreX(AUTHOR, 7), 60, AUTHOR);
+  u8g2.drawStr(textCentreX(AUTHOR, 6), 60, AUTHOR);
 }
 
 // Draw static content on Wi-Fi menu
 void Menu::drawWifiMenu() {
   // Draw SSID
-  u8g2.setFont(u8g2_font_7x13B_tf);
+  u8g2.setFont(u8g2_font_6x12_tf);
   u8g2.drawStr(11, 28, "ID");
-  u8g2.setFont(u8g2_font_7x13_tf);
+  u8g2.setFont(u8g2_font_6x12_tf);
   u8g2.drawStr(30, 28, WIFI_SSID);
 
   // Draw password
-  u8g2.setFont(u8g2_font_7x13B_tf);
+  u8g2.setFont(u8g2_font_6x12_tf);
   u8g2.drawStr(4, 44, "PWD");
-  u8g2.setFont(u8g2_font_7x13_tf);
+  u8g2.setFont(u8g2_font_6x12_tf);
   u8g2.drawStr(30, 44, WIFI_PASSWORD);
 
   // Draw IP
-  u8g2.setFont(u8g2_font_7x13B_tf);
+  u8g2.setFont(u8g2_font_6x12_tf);
   u8g2.drawStr(11, 60, "IP");
   if (strlen(WIFI_IP) < 15) {  // If not 15 characters use regular font
-    u8g2.setFont(u8g2_font_7x13_tf);
+    u8g2.setFont(u8g2_font_6x12_tf);
     u8g2.drawStr(30, 60, WIFI_IP);
   } else {  // If 15 characters use smaller font, otherwise last digit off screen
-    u8g2.setFont(u8g2_font_6x12_tf);
+    u8g2.setFont(u8g2_font_5x7_tf);
     u8g2.drawStr(30, 59, WIFI_IP);
   }
 }
@@ -487,10 +487,10 @@ void Menu::drawWifiMenu() {
 void Menu::drawSerialMenu() {
   char baudString[13];
   snprintf(baudString, sizeof(baudString), "%d Baud", USB_SERIAL_BAUD);
-  u8g2.drawStr(textCentreX(baudString, 7), 28, baudString);
+  u8g2.drawStr(textCentreX(baudString, 6), 28, baudString);
 
   const char *info = "Use client program";
-  u8g2.drawStr(textCentreX(info, 7), 44, info);
+  u8g2.drawStr(textCentreX(info, 6), 44, info);
 }
 
 // Update icons for selected settings options
