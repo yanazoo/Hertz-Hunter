@@ -54,8 +54,8 @@ void RX5808::calibrate(bool high) {
   // Set to F4
   setFrequency(5800);
 
-  // Give time for rssi to stabilise
-  delay(RSSI_STABILISATION_TIME);
+  // Give extended time for rssi to stabilise accurately during calibration
+  delay(50);
 
   // Save rssi
   if (high) {

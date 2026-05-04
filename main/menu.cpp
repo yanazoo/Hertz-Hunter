@@ -338,6 +338,7 @@ void Menu::drawScanMenu() {
   int minRssi = settings->lowCalibratedRssi.get();
   int maxRssi = settings->highCalibratedRssi.get();
   xSemaphoreGive(settings->settingsMutex);
+  if (maxRssi <= minRssi) maxRssi = minRssi + 1;  // Prevent divide-by-zero in map()
   int numScannedValues = (SCAN_FREQUENCY_RANGE / interval) + 1;
 
   // Calculate bar dimensions
