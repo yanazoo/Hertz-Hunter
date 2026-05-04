@@ -441,10 +441,9 @@ void Menu::drawScanMenu() {
     for (int m = 0; m < markerCount; m++) {
       int mIdx = markerIndices[m];
       if (mIdx >= 0 && mIdx < numScannedValues) {
-        int cx = mIdx * barWidth + padding + barWidth / 2;
-        u8g2.drawHLine(cx - 1, BAR_Y_MIN - 3, 3);
-        u8g2.drawPixel(cx, BAR_Y_MIN - 2);
-        u8g2.drawPixel(cx, BAR_Y_MIN - 1);
+        int lx = mIdx * barWidth + padding + barWidth / 2 - 1;
+        u8g2.drawHLine(lx, BAR_Y_MIN - 2, 3);
+        u8g2.drawPixel(lx + 1, BAR_Y_MIN - 1);
       }
     }
     u8g2.setDrawColor(1);
