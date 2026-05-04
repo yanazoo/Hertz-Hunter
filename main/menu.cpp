@@ -560,8 +560,6 @@ void Menu::initMenus() {
   markersMenuItems[0] = { "Off", bitmap_Blank };
   markersMenuItems[1] = { "1", bitmap_Blank };
   markersMenuItems[2] = { "2", bitmap_Blank };
-  markersMenuItems[3] = { "3", bitmap_Blank };
-  markersMenuItems[4] = { "4", bitmap_Blank };
 
   // Scan Interval menu
   scanIntervalMenuItems[0] = { "2.5MHz", bitmap_Blank };
@@ -602,7 +600,7 @@ void Menu::initMenus() {
   menus[SCAN_INTERVAL] = { "Scan interval", scanIntervalMenuItems, 3, 0 };
   menus[BUZZER] = { "Buzzer", buzzerMenuItems, 2, 0 };
   menus[BATTERY_ALARM] = { "Bat. alarm", batteryAlarmMenuItems, 3, 0 };
-  menus[MARKERS] = { "Markers", markersMenuItems, 5, 0 };
+  menus[MARKERS] = { "Markers", markersMenuItems, 3, 0 };
   menus[CALIBRATION] = { "Calibration", calibrationMenuItems, 2, 0 };
   menus[WIFI] = { "Wi-Fi", nullptr, 1, 0 };
   menus[USB_SERIAL] = { "USB Serial", nullptr, 1, 0 };

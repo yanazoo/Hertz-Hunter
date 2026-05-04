@@ -84,7 +84,7 @@ private:
 
   menuItemStruct mainMenuItems[3];
   menuItemStruct settingsMenuItems[4];
-  menuItemStruct markersMenuItems[5];
+  menuItemStruct markersMenuItems[3];
   menuItemStruct scanIntervalMenuItems[3];
   menuItemStruct buzzerMenuItems[2];
   menuItemStruct batteryAlarmMenuItems[3];

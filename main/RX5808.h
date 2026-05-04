@@ -15,7 +15,7 @@
 
 #define SCAN_STACK_SIZE 3072
 
-#define MAX_MARKERS 4
+#define MAX_MARKERS 2
 
 struct MarkerData {
   int index;
