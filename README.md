@@ -1,5 +1,7 @@
 # Hertz Hunter
 
+*[日本語版はこちら](README.ja.md)*
+
 ## Introduction
 
 A poor-man's [RF Explorer](https://j3.rf-explorer.com/) for FPV drones. Useful for quickly determining which frequencies are in use, where background noise is occurring, and diagnosing malfunctioning video transmitters (VTXs). Designed to be cheap (<$60 AUD) and easy to build yourself.
