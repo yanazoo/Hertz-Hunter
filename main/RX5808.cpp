@@ -24,6 +24,9 @@ RX5808::RX5808(uint8_t data, uint8_t le, uint8_t clk, uint8_t rssi, Settings *s)
     markers[i].rssi = 0;
   }
 
+  monitorMode = false;
+  monitorIndex = 0;
+
   // Create mutexes
   scanMutex = xSemaphoreCreateMutex();
   lowbandMutex = xSemaphoreCreateMutex();
@@ -85,71 +88,99 @@ void RX5808::_scan(void *parameter) {
   // Loop continuously
   // Stops when scanning task cancelled
   while (!receiver->stopRequested) {
-    for (int i = 0; i < numScannedValues; i++) {
-      // Safely stop scanning when no mutexes taken
-      if (receiver->stopRequested) break;
+    if (receiver->monitorMode) {
+      // Monitor mode: lock PLL on single frequency for stable continuous reading
+      int idx = receiver->monitorIndex;
 
-      // Read lowband state per frequency to respond immediately to band changes
       xSemaphoreTake(receiver->lowbandMutex, portMAX_DELAY);
       bool lowband = receiver->lowband.get();
       xSemaphoreGive(receiver->lowbandMutex);
 
       int min_freq = lowband ? LOWBAND_MIN_FREQUENCY : HIGHBAND_MIN_FREQUENCY;
+      receiver->setFrequency((int)round(idx * interval + min_freq));
 
-      // Set frequency and offset by minimum
-      receiver->setFrequency((int)round(i * interval + min_freq));
-
-      // Give time for rssi to stabilise
+      // Wait for initial PLL lock
       vTaskDelay(pdMS_TO_TICKS(RSSI_STABILISATION_TIME));
 
-      // Safely stop scanning when no mutexes taken
-      // Second call in case task cancelled during delay
-      if (receiver->stopRequested) break;
-
-      // Take mutex to safely modify data in this task
-      xSemaphoreTake(receiver->scanMutex, portMAX_DELAY);
-      receiver->rssiValues.set(i, receiver->readRSSI());
-      xSemaphoreGive(receiver->scanMutex);
-    }
-
-    // After each full pass, compute peak markers if requested
-    if (!receiver->stopRequested) {
-      xSemaphoreTake(receiver->settings->settingsMutex, portMAX_DELAY);
-      int numMarkers = receiver->settings->markerCount.get();
-      xSemaphoreGive(receiver->settings->settingsMutex);
-
-      if (numMarkers > 0) {
-        bool used[MAX_FREQUENCIES_SCANNED];
-        memset(used, 0, sizeof(used));
-        MarkerData newMarkers[MAX_MARKERS];
-        for (int m = 0; m < MAX_MARKERS; m++) {
-          newMarkers[m].index = -1;
-          newMarkers[m].rssi = 0;
-        }
+      // Continuously sample without switching frequency
+      while (!receiver->stopRequested && receiver->monitorMode) {
+        if (receiver->monitorIndex != idx) break;  // Re-lock if cursor moved
 
         xSemaphoreTake(receiver->scanMutex, portMAX_DELAY);
-        for (int m = 0; m < numMarkers; m++) {
-          int maxVal = -1, maxIdx = -1;
-          for (int i = 0; i < numScannedValues; i++) {
-            if (!used[i] && receiver->rssiValues.get(i) > maxVal) {
-              maxVal = receiver->rssiValues.get(i);
-              maxIdx = i;
-            }
-          }
-          if (maxIdx >= 0) used[maxIdx] = true;
-          newMarkers[m].index = maxIdx;
-          newMarkers[m].rssi = maxVal;
-        }
+        receiver->rssiValues.set(idx, receiver->readRSSI());
         xSemaphoreGive(receiver->scanMutex);
 
-        xSemaphoreTake(receiver->markersMutex, portMAX_DELAY);
-        for (int m = 0; m < MAX_MARKERS; m++) {
-          receiver->markers[m] = (m < numMarkers) ? newMarkers[m] : MarkerData{-1, 0};
-        }
-        xSemaphoreGive(receiver->markersMutex);
+        vTaskDelay(pdMS_TO_TICKS(5));  // Minimal delay; no frequency switching needed
       }
-    }
-  }
+    } else {
+      // Sweep mode: scan all frequencies in order
+      for (int i = 0; i < numScannedValues; i++) {
+        // Safely stop scanning when no mutexes taken
+        if (receiver->stopRequested) break;
+        if (receiver->monitorMode) break;  // Switch to monitor mode immediately
+
+        // Read lowband state per frequency to respond immediately to band changes
+        xSemaphoreTake(receiver->lowbandMutex, portMAX_DELAY);
+        bool lowband = receiver->lowband.get();
+        xSemaphoreGive(receiver->lowbandMutex);
+
+        int min_freq = lowband ? LOWBAND_MIN_FREQUENCY : HIGHBAND_MIN_FREQUENCY;
+
+        // Set frequency and offset by minimum
+        receiver->setFrequency((int)round(i * interval + min_freq));
+
+        // Give time for rssi to stabilise
+        vTaskDelay(pdMS_TO_TICKS(RSSI_STABILISATION_TIME));
+
+        // Safely stop scanning when no mutexes taken
+        // Second call in case task cancelled during delay
+        if (receiver->stopRequested) break;
+
+        // Take mutex to safely modify data in this task
+        xSemaphoreTake(receiver->scanMutex, portMAX_DELAY);
+        receiver->rssiValues.set(i, receiver->readRSSI());
+        xSemaphoreGive(receiver->scanMutex);
+      }
+
+      // After each full sweep pass, compute peak markers if requested
+      if (!receiver->stopRequested && !receiver->monitorMode) {
+        xSemaphoreTake(receiver->settings->settingsMutex, portMAX_DELAY);
+        int numMarkers = receiver->settings->markerCount.get();
+        xSemaphoreGive(receiver->settings->settingsMutex);
+
+        if (numMarkers > 0) {
+          bool used[MAX_FREQUENCIES_SCANNED];
+          memset(used, 0, sizeof(used));
+          MarkerData newMarkers[MAX_MARKERS];
+          for (int m = 0; m < MAX_MARKERS; m++) {
+            newMarkers[m].index = -1;
+            newMarkers[m].rssi = 0;
+          }
+
+          xSemaphoreTake(receiver->scanMutex, portMAX_DELAY);
+          for (int m = 0; m < numMarkers; m++) {
+            int maxVal = -1, maxIdx = -1;
+            for (int i = 0; i < numScannedValues; i++) {
+              if (!used[i] && receiver->rssiValues.get(i) > maxVal) {
+                maxVal = receiver->rssiValues.get(i);
+                maxIdx = i;
+              }
+            }
+            if (maxIdx >= 0) used[maxIdx] = true;
+            newMarkers[m].index = maxIdx;
+            newMarkers[m].rssi = maxVal;
+          }
+          xSemaphoreGive(receiver->scanMutex);
+
+          xSemaphoreTake(receiver->markersMutex, portMAX_DELAY);
+          for (int m = 0; m < MAX_MARKERS; m++) {
+            receiver->markers[m] = (m < numMarkers) ? newMarkers[m] : MarkerData{-1, 0};
+          }
+          xSemaphoreGive(receiver->markersMutex);
+        }
+      }
+    }  // end sweep mode
+  }  // end while
 
   // Task closed
   receiver->scanHandle = NULL;

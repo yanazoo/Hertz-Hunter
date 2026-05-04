@@ -10,7 +10,7 @@
 #define LOWBAND_MIN_FREQUENCY 5345
 #define SCAN_FREQUENCY_RANGE 300
 
-#define RSSI_STABILISATION_TIME 5
+#define RSSI_STABILISATION_TIME 15
 #define RSSI_SAMPLES 10
 
 #define SCAN_STACK_SIZE 3072
@@ -33,6 +33,9 @@ public:
   VariableArrayRestricted<int, MAX_FREQUENCIES_SCANNED> rssiValues;
   Variable<bool> lowband;
   MarkerData markers[MAX_MARKERS];
+
+  volatile bool monitorMode;
+  volatile int monitorIndex;
 
   SemaphoreHandle_t scanMutex;
   SemaphoreHandle_t lowbandMutex;

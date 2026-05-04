@@ -95,6 +95,19 @@ void Menu::handleButtons() {
     settings->clearReset();
   }
 
+  // Toggle monitor mode with PREV+SELECT on scan screen
+  if (menuIndex == SCAN && prevPressed == HIGH && selectPressed == HIGH && nextPressed == LOW) {
+    receiver->monitorMode = !receiver->monitorMode;
+    if (receiver->monitorMode) receiver->monitorIndex = menus[SCAN].menuIndex;
+    xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
+    if (settings->buzzer.get()) buzzer->doubleBuzz();
+    xSemaphoreGive(settings->settingsMutex);
+    selectButtonPressTime = 0;
+    selectButtonHeld = false;
+    delay(DEBOUNCE_DELAY * 2);
+    return;
+  }
+
   // Toggle marker overlay with PREV+NEXT simultaneously on scan screen
   if (menuIndex == SCAN && prevPressed == HIGH && nextPressed == HIGH) {
     showMarkers = !showMarkers;
@@ -109,6 +122,11 @@ void Menu::handleButtons() {
   if (nextPressed == HIGH || prevPressed == HIGH) {
     int direction = (nextPressed == HIGH) ? 1 : -1;
     menus[menuIndex].menuIndex = (menus[menuIndex].menuIndex + direction + menus[menuIndex].menuItemsLength) % menus[menuIndex].menuItemsLength;
+
+    // Sync monitor index when cursor moves on scan screen in monitor mode
+    if (menuIndex == SCAN && receiver->monitorMode) {
+      receiver->monitorIndex = menus[SCAN].menuIndex;
+    }
 
     // Sound buzzer on button press if necessary
     xSemaphoreTake(settings->settingsMutex, portMAX_DELAY);
@@ -390,9 +408,11 @@ void Menu::drawScanMenu() {
     u8g2.drawStr(109, DISPLAY_HEIGHT, "5945");
   }
 
-  // Draw high or low band
+  // Draw band label or monitor mode indicator
   u8g2.setFont(u8g2_font_7x13_tf);
-  if (lowband) {
+  if (receiver->monitorMode) {
+    u8g2.drawStr(0, 13, "MON");
+  } else if (lowband) {
     u8g2.drawStr(0, 13, "LOW");
   } else {
     u8g2.drawStr(0, 13, "HIGH");
