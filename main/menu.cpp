@@ -283,19 +283,19 @@ void Menu::drawMenu() {
   }
 }
 
-// Display battery voltage in bottom corner of main menu
+// Display battery voltage in bottom corner of main and scan menus
 void Menu::drawBatteryVoltage(int voltage) {
-  // Draw voltage only display if on main menu
-  if (menuIndex == MAIN) {
-    // Format voltage reading
-    char formattedVoltage[5];
-    snprintf(formattedVoltage, sizeof(formattedVoltage), "%d.%dv", voltage / 10, voltage % 10);
+  char formattedVoltage[5];
+  snprintf(formattedVoltage, sizeof(formattedVoltage), "%d.%dv", voltage / 10, voltage % 10);
+  u8g2.setFont(u8g2_font_5x7_tf);
 
+  if (menuIndex == MAIN) {
     // Set font colour to inverted if selected bottom item
     u8g2.setDrawColor(menus[MAIN].menuIndex == 2 ? 0 : 1);
-    u8g2.setFont(u8g2_font_5x7_tf);
     u8g2.drawStr(109, DISPLAY_HEIGHT, formattedVoltage);
     u8g2.setDrawColor(1);
+  } else if (menuIndex == SCAN) {
+    u8g2.drawStr(108, DISPLAY_HEIGHT, formattedVoltage);
   }
 }
 
@@ -393,7 +393,7 @@ void Menu::drawScanMenu() {
       char label[10];
       snprintf(label, sizeof(label), "M%d:%d", m + 1, markerFreqs[m]);
       int x = m * DISPLAY_WIDTH / markerCount;
-      x = min(x, (int)(DISPLAY_WIDTH - (int)strlen(label) * 6));
+      x = min(x, (int)(DISPLAY_WIDTH - 22 - (int)strlen(label) * 6));
       u8g2.drawStr(x, DISPLAY_HEIGHT, label);
     }
   } else {
@@ -401,11 +401,11 @@ void Menu::drawScanMenu() {
     if (lowband) {
       u8g2.drawStr(0, DISPLAY_HEIGHT, "5345");
       u8g2.drawStr(55, DISPLAY_HEIGHT, "5495");
-      u8g2.drawStr(109, DISPLAY_HEIGHT, "5645");
+      u8g2.drawStr(86, DISPLAY_HEIGHT, "5645");
     } else {
       u8g2.drawStr(0, DISPLAY_HEIGHT, "5645");
       u8g2.drawStr(55, DISPLAY_HEIGHT, "5795");
-      u8g2.drawStr(109, DISPLAY_HEIGHT, "5945");
+      u8g2.drawStr(86, DISPLAY_HEIGHT, "5945");
     }
   }
 
